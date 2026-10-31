@@ -1,0 +1,17 @@
+{
+  "name": "pi-remote-hub",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "pi-remote hub: agent relay, phone REST API, PWA host (docs/SPEC.md §3-§5, §10)",
+  "engines": {
+    "node": ">=22"
+  },
+  "main": "server.mjs",
+  "scripts": {
+    "start": "node server.mjs"
+  },
+  "dependencies": {
+    "ws": "^8.18.0"
+  }
+}

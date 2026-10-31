@@ -1,0 +1,7 @@
+{
+  "name": "pi-remote-extension",
+  "private": true,
+  "pi": {
+    "extensions": ["./index.ts"]
+  }
+}

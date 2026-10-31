@@ -1,0 +1,18 @@
+{
+	"name": "pi-image",
+	"version": "0.1.0",
+	"private": true,
+	"type": "module",
+	"description": "Clipboard image paste + inline preview extension for pi (KDE Plasma / Konsole, Wayland-first)",
+	"main": "index.ts",
+	"scripts": {
+		"typecheck": "tsc",
+		"test": "jiti harness/run.ts"
+	},
+	"devDependencies": {
+		"@earendil-works/pi-coding-agent": "1.4.0",
+		"@earendil-works/pi-tui": "1.4.0",
+		"jiti": "^2.7.0",
+		"typescript": "^5.9.3"
+	}
+}

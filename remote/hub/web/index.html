@@ -1,0 +1,79 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>pi-remote</title>
+  <meta name="description" content="Control pi agents from your phone.">
+  <meta name="theme-color" content="#0b0d10">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="pi-remote">
+  <link rel="manifest" href="manifest.webmanifest">
+  <link rel="icon" type="image/svg+xml" href="icons/icon-192.svg">
+  <link rel="apple-touch-icon" href="icons/icon-192.svg">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <!-- Login -->
+  <section id="view-login" hidden>
+    <form id="login-form" class="login-box">
+      <h1>pi-remote</h1>
+      <p class="dim">Enter the hub password.</p>
+      <input id="login-password" type="password" autocomplete="current-password"
+             placeholder="Password" required>
+      <button id="login-submit" class="btn primary block" type="submit">Sign in</button>
+      <p id="login-error" class="error" role="alert"></p>
+    </form>
+  </section>
+
+  <!-- Dashboard -->
+  <section id="view-dashboard" hidden>
+    <header class="topbar">
+      <h1>pi-remote</h1>
+      <span id="conn-dot" class="conn" title="Connection"></span>
+    </header>
+    <main id="machine-list" class="content"></main>
+  </section>
+
+  <!-- Attach view -->
+  <section id="view-attach" hidden>
+    <header class="topbar attach-bar">
+      <button id="attach-back" class="btn icon" type="button" aria-label="Back">←</button>
+      <div class="attach-title">
+        <span id="attach-name">Session</span>
+        <span id="attach-sub" class="dim small"></span>
+      </div>
+      <button id="attach-abort" class="btn warn" type="button">Abort</button>
+      <button id="attach-stop" class="btn danger" type="button" hidden>Stop</button>
+    </header>
+    <main id="transcript" class="transcript" aria-live="polite"></main>
+    <!-- Panels between the transcript and the composer; attach.mjs renders
+         into them. Both collapse to their header row; hidden when empty. -->
+    <div id="todo-panel" class="side-panel" hidden></div>
+    <div id="agents-panel" class="side-panel" hidden></div>
+    <form id="composer" class="composer">
+      <div id="deliveras-row" class="deliveras-row" hidden>
+        <span class="dim small">Send as</span>
+        <div class="seg-group" role="group" aria-label="Delivery mode">
+          <button type="button" id="seg-steer" class="seg active">Steer</button>
+          <button type="button" id="seg-queue" class="seg">Queue</button>
+        </div>
+      </div>
+      <div id="pending-row" class="pending-row" hidden></div>
+      <div class="composer-row">
+        <div class="composer-field">
+          <input id="file-input" type="file" hidden>
+          <textarea id="composer-input" rows="1" placeholder="Message…" enterkeyhint="send"></textarea>
+          <button type="button" id="file-btn" class="composer-btn" aria-label="Attach file">＋</button>
+          <button type="submit" id="send-btn" class="composer-btn primary">Send</button>
+        </div>
+      </div>
+    </form>
+  </section>
+
+  <script defer src="vendor/highlightjs/highlight.min.js"></script>
+  <script type="module" src="app/main.mjs"></script>
+</body>
+</html>

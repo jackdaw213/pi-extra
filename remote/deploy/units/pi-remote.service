@@ -1,0 +1,26 @@
+# pi-remote cold-start stub (docs/SPEC.md §11). User unit, activated by
+# pi-remote.socket. The stub answers a knock and exits; the socket unit
+# re-wakes it per connection, so this unit deliberately has NO Restart=.
+[Unit]
+Description=pi-remote cold-start stub
+Requires=pi-remote.socket
+
+[Service]
+ExecStart=/usr/bin/node %h/.pi/remote/stub.mjs
+RemainAfterExit=no
+# Hardening per SPEC §11 (mirrors the spawn sandbox, minus spawn-only paths).
+ProtectSystem=strict
+ProtectHome=read-only
+ReadWritePaths=%h/.pi
+ReadWritePaths=/tmp
+NoNewPrivileges=yes
+ProtectKernelTunables=yes
+ProtectKernelModules=yes
+ProtectControlGroups=yes
+ProtectClock=yes
+ProtectHostname=yes
+RestrictSUIDSGID=yes
+RestrictNamespaces=yes
+LockPersonality=yes
+StandardOutput=journal
+StandardError=journal

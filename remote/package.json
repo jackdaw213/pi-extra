@@ -1,0 +1,12 @@
+{
+  "name": "pi-remote",
+  "private": true,
+  "type": "module",
+  "description": "Control pi sessions from a phone. Zero-dependency codebase; tests use Node's built-in runner.",
+  "scripts": {
+    "test": "node --test"
+  },
+  "engines": {
+    "node": ">=22"
+  }
+}

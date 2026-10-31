@@ -1,0 +1,12 @@
+# pi-remote cold-start stub socket (docs/SPEC.md §11).
+# User unit. Holds 0.0.0.0:8788 and wakes pi-remote.service per connection;
+# install with deploy/install.sh --units.
+[Unit]
+Description=pi-remote cold-start stub socket
+
+[Socket]
+ListenStream=0.0.0.0:8788
+Accept=no
+
+[Install]
+WantedBy=sockets.target

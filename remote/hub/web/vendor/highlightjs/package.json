@@ -1,0 +1,1 @@
+{ "type": "commonjs", "private": true, "description": "Node scope only: the repo root is type:module, which would otherwise make Node treat the vendored UMD bundle as ESM. Ignored by the browser." }

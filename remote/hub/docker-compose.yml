@@ -1,0 +1,36 @@
+# pi-remote hub compose file (docs/SPEC.md §10) — hardened.
+#
+# Run from hub/:  PI_REMOTE_PASSWORD=... docker compose up -d --build
+# The machine-tokens file is read from /data/tokens inside the pi-remote-data
+# volume; it must be readable by uid 1000 (node), e.g. chmod 644.
+
+services:
+  hub:
+    build:
+      context: ..
+      dockerfile: hub/Dockerfile
+    image: pi-remote-hub:latest
+    container_name: pi-remote-hub
+    restart: unless-stopped
+    ports:
+      - "8787:8787"
+    environment:
+      PI_REMOTE_PASSWORD: ${PI_REMOTE_PASSWORD:?Set PI_REMOTE_PASSWORD (env or .env)}
+      PI_REMOTE_TOKENS_FILE: /data/tokens
+      PI_REMOTE_PORT: "8787"
+    volumes:
+      - pi-remote-data:/data
+    read_only: true
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:8787/api/health || exit 1"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+
+volumes:
+  pi-remote-data:
