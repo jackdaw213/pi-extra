@@ -161,7 +161,7 @@ rendering strategy in regular mode.
 ## Install
 
 ```bash
-ln -sfn ~/GitHub/pi-extra/clipboard-image ~/.pi/agent/extensions/pi-image
+ln -sfn ~/GitHub/pi-extra/clipboard-image ~/.pi/agent/extensions/clipboard-image
 ```
 
 Requires: `wl-clipboard` (Wayland), `imagemagick`. Transcript image rendering
