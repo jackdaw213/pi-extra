@@ -55,8 +55,8 @@ function errMessage(err: unknown): string {
 }
 
 // Session-start reporting before a bridge exists (config problems, start
-// failure, subagent inert notice): notify through pi's UI when one is present,
-// console otherwise. Raw console.error lines overprint the composer in terminal
+// failure): notify through pi's UI when one is present, console otherwise.
+// Raw console.error lines overprint the composer in terminal sessions.
 // sessions. UI calls are wrapped in try/catch: reporting must never break
 // session startup.
 function uiNotify(ctx: any, msg: string): void {
@@ -187,14 +187,9 @@ export default function piRemoteExtension(pi: any): void {
 		try {
 			// Subagent sessions (in-process) must never reach the hub as sessions
 			// of their own: stay inert, activity keeps flowing to the phone through
-			// the parent session's events and bridge. This is routine, expected
-			// behavior — visible only in headless logs, never as terminal noise.
+			// the parent session's events and bridge. Fully silent: subagent-inert
+			// is routine, and the removed stderr notice overprinted the parent TUI.
 			if (isSubagentSession(subagentSignals(ctx, event?.reason))) {
-				if (ctx?.mode !== "tui") {
-					console.error(
-						`[pi-remote] subagent session detected${typeof event?.reason === "string" ? ` (reason ${event.reason})` : ""}; extension stays inert for it`,
-					);
-				}
 				return;
 			}
 			const cfg = loadConfig((msg) => uiNotify(ctx, msg));
