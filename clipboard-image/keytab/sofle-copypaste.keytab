@@ -237,3 +237,21 @@ key Copy   : "\E[99;6u"
 key Cut    : "\E[120;6u"
 key Paste  : "\E[118;6u"
 key Undo   : "\E[122;5u"
+
+# ==============================================================
+# Plasma 6.8.2 (kwin) no longer delivers the hardware PASTE key as
+# its XF86 keysym: it arrives as the standard paste chord
+# (Ctrl+Shift+V), so "key Paste" above never fires. Verified 2026-11-01:
+# kglobalaccel claims no XF86Paste shortcut (D-Bus actionList is empty),
+# cat -v shows no bytes, while Konsole's own Paste action pastes text —
+# the chord is consumed by that action before terminal emulation.
+#
+# With Konsole's Paste ACTION unbound (Configure Keyboard Shortcuts),
+# the chord falls through to this entry and the hardware key sends the
+# same bytes as before. Inside kitty-protocol apps (pi) the chord is
+# kitty-encoded (ESC[86;6u) before the keytab is consulted — pi's
+# clipboard-image extension parses that directly. Terminals without
+# kitty support (fish, cat -v) take this entry; the fish conf.d
+# binding in keytab/README.md then handles text paste at the prompt.
+# ==============================================================
+key V+Ctrl+Shift : "\E[118;6u"

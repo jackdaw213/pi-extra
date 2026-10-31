@@ -143,6 +143,35 @@ Wayland). The file was validated field by field against the shipped
 `default.keytab` and a re-implementation of Konsole's keytab parser; the
 only unverified step is the live GUI test, which needs a running Konsole.
 
+## Plasma 6.8.2 regression: the hardware PASTE key arrives as a chord (fixed)
+
+Since the kwin 6.8.2 update (2026-10-31), the hardware PASTE key no longer
+reaches Konsole as `XF86Paste`. Verified 2026-11-01:
+
+- `cat -v` + hardware PASTE shows NO bytes — the keytab entry never fires.
+- With text on the clipboard the text still pastes — that is Konsole's own
+  `edit_paste` action (default shortcut Ctrl+Shift+V) consuming a synthesized
+  paste chord; with an image on the clipboard it pastes nothing (Konsole can
+  only paste text). kglobalaccel claims no XF86Paste shortcut (D-Bus
+  `org.kde.KGlobalAccel.actionList` returns empty), so the translation
+  happens inside kwin, not in a shortcut binding.
+
+**The fix (in this repo's keytab):** a `key V+Ctrl+Shift` entry sends the
+same byte sequence the hardware key used to send. It needs Konsole's Paste
+ACTION unbound so the chord falls through to the terminal emulation:
+
+1. Copy the updated keytab to `~/.local/share/konsole/` (same filename —
+   the profile selection survives) and fully restart Konsole.
+2. Settings → Configure Keyboard Shortcuts → **Paste** → clear the
+   Ctrl+Shift+V binding. (Edit → Paste stays available via the menu.)
+3. Keep the fish binding below for text paste at the shell prompt.
+
+Result, verified at each hop: pi (kitty protocol) receives `ESC[86;6u` and
+clipboard-image queues the image (pty-tested 2026-11-01); fish receives
+`ESC[118;6u` and the binding below inserts clipboard text; `cat -v` shows
+`^[[118;6u` again. If a future Plasma fixes the keysym delivery, the old
+`key Paste` entry resumes automatically — both entries can coexist.
+
 ## Making the keys work in NORMAL terminals (outside pi)
 
 The keytab sends escape bytes to the running program. pi understands them; a
