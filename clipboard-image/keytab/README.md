@@ -105,6 +105,14 @@ unconditionally - no kitty-protocol negotiation is needed. Do not use
   XF86Copy/XF86Paste/XF86Cut/XF86Undo (from the earlier manual mapping).
   A KDE shortcut captures the key before Konsole sees it. Those mappings
   keep working in KDE apps; only remove them if they block the keytab.
+  GOTCHA (cost a full 2026-11-01 debugging session): the remnant is NOT
+  stored as "XF86Paste" — kdeglobals `[Shortcuts]` stores it under the Qt
+  name: `Paste=Paste; Shift+Ins; Ctrl+V`. The leading bare `Paste` IS the
+  hardware key (Qt renders Key_Paste as "Paste"). It makes every KDE app's
+  standard paste action eat the hardware key (zero terminal bytes, text
+  pastes, images dead). Fix: drop the leading `Paste;` from that line
+  (keep Shift+Ins/Ctrl+V), restart Konsole. grep for "^Paste=" in
+  kdeglobals, not for "XF86".
 - **Kitty protocol interplay.** pi requests kitty keyboard flags 7 at
   startup. Konsole 26.08 then kitty-encodes ordinary keys, but these four
   keys have no kitty functional codes and produce no text, so Konsole falls
