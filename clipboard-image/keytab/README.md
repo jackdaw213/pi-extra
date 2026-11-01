@@ -105,14 +105,22 @@ unconditionally - no kitty-protocol negotiation is needed. Do not use
   XF86Copy/XF86Paste/XF86Cut/XF86Undo (from the earlier manual mapping).
   A KDE shortcut captures the key before Konsole sees it. Those mappings
   keep working in KDE apps; only remove them if they block the keytab.
-  GOTCHA (cost a full 2026-11-01 debugging session): the remnant is NOT
-  stored as "XF86Paste" — kdeglobals `[Shortcuts]` stores it under the Qt
-  name: `Paste=Paste; Shift+Ins; Ctrl+V`. The leading bare `Paste` IS the
-  hardware key (Qt renders Key_Paste as "Paste"). It makes every KDE app's
-  standard paste action eat the hardware key (zero terminal bytes, text
-  pastes, images dead). Fix: drop the leading `Paste;` from that line
-  (keep Shift+Ins/Ctrl+V), restart Konsole. grep for "^Paste=" in
-  kdeglobals, not for "XF86".
+  GOTCHA (cost a full 2026-11-01 debugging session): there are TWO hiding
+  places, and the one that matters for Konsole is NOT obvious:
+  1. `~/.config/kdeglobals` `[Shortcuts]` — stored under the Qt name:
+     `Paste=Paste; Shift+Ins; Ctrl+V` (the leading bare `Paste` IS the
+     hardware key; greps for "XF86" miss it). This one governs OTHER KDE
+     apps' standard paste action — removing it kills hardware paste there.
+  2. **`~/.local/share/kxmlgui5/konsole/sessionui.rc`** — KXmlGui per-action
+     saved shortcuts, which OVERRIDE everything for Konsole:
+     `<Action name="edit_paste" shortcut="Ctrl+Shift+V; Paste"/>`. The
+     trailing `Paste` captures the hardware key inside Konsole even when
+     kdeglobals is clean (Qt log proof: Key_Paste → ExactMatch → dispatched
+     to edit_paste; Key_Undo → NoMatch → keytab fires). Konsole itself
+     re-writes this file whenever its Shortcuts dialog is OKed.
+  Fix for Konsole: drop `; Paste` from the sessionui.rc line (keep
+  Ctrl+Shift+V), restart Konsole. Keep kdeglobals intact so the hardware
+  key still pastes in other KDE apps — the two layers are independent.
 - **Kitty protocol interplay.** pi requests kitty keyboard flags 7 at
   startup. Konsole 26.08 then kitty-encodes ordinary keys, but these four
   keys have no kitty functional codes and produce no text, so Konsole falls
