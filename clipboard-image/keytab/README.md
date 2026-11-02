@@ -213,7 +213,8 @@ Requires the keytab from this directory to be selected in the Konsole
 profile, so that pressing PASTE sends `ESC [ 118 ; 6 u` to fish.
 
 Install: save one file, `~/.config/fish/conf.d/sofle-paste.fish`, with
-exactly this content (fish loads `conf.d/*.fish` automatically):
+exactly this content (fish loads `conf.d/*.fish` automatically; takes effect
+in NEW shells only):
 
 ```fish
 # Sofle PASTE key: insert clipboard text at cursor (kitty CSI-u from Konsole keytab)
@@ -236,6 +237,11 @@ Escaping rules, all verified on fish 4.9.3 (Arch):
   became `AXXA`.
 - Empty clipboard: `(wl-paste -n ...)` expands to nothing and the key is a
   silent no-op. Multi-line clipboard text inserts verbatim, newlines kept.
+- **Over SSH the binding is inert**: the remote shell cannot see the local
+  clipboard (`wl-paste` has no Wayland session there). To paste over SSH use
+  Konsole's own paste — `Ctrl+V` or `Shift+Insert` — which reads the local
+  clipboard and writes the text through the pty. Works on any server, no
+  remote setup.
 
 Test proof (python3 pty harness, headless, fish 4.9.3): fish started with
 `--no-config` in a pty, the binding installed, then the literal bytes
