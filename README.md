@@ -9,5 +9,9 @@ My pi add-ons. One folder per extension, each self-contained;
   copy/paste keys work.
 - **session-name/** — auto-names new sessions from the first message.
 - **remote/** — use pi from the phone via the hub dashboard.
+- **web-fetch-fallback/** — skill for pages that block normal fetching (403s,
+  CAPTCHA / Cloudflare challenges): a fetch ladder — normal fetch, FlareSolverr
+  on the homelab, then site mirrors — with a verdict-checked fetch script.
+  `~/.pi/agent/skills/` points at it.
 
 Install steps live in each folder's README.
