@@ -155,7 +155,10 @@ systemd-run --user --collect --quiet
 - Path 2 (zero sessions): hub → `http://<machine-ip>:8788/spawn?token=...&name=...`;
   `stub/stub.mjs` (woken by the socket unit) runs the same wrapper, replies
   200 `{"ok":true}`, idles out. Machine IP = registry-reported LAN/ZeroTier
-  address (`hello.machine.addresses` = non-internal IPv4s).
+  address (`hello.machine.addresses` = non-internal IPv4s). Machine records
+  (identity, addresses, spawn token) persist to `machines.json` next to the
+  tokens file (`PI_REMOTE_MACHINES_FILE`) and are restored at boot, so path 2
+  works right after a hub restart — before any pi session reconnects.
 - The new session's own extension dials the hub and appears on the dashboard
   (uniform model — child sessions serve themselves; the spawner only fires
   the unit). pi in RPC mode needs no TTY and loads extensions `[R-Q5]`.
@@ -192,6 +195,15 @@ systemd-run --user --collect --quiet
 - Hub `abort` → `ctx.abort()`. Hub `stop` (mode remote only) →
   `ctx.shutdown()`. Hub `delete` (any mode; ADR 0006) → optional erase of the
   transcript + inbox for temp sessions after exit, then `ctx.shutdown()`.
+  Remote sessions exit for real: pi's RPC loop only re-checks the shutdown
+  flag after the next stdin command or an `agent_settled`, and phone-spawned
+  sessions have a stdin pipe that never closes and no RPC client — so an
+  idle `ctx.shutdown()` alone leaves a zombie the hub keeps listing. The
+  bridge aborts (settles a busy run), shuts down, and — when idle — exits
+  the process after a 250 ms grace. A detached watcher stops the transient
+  unit once the pi pid is gone (the pipeline sh would otherwise wait on
+  `sleep infinity` forever), and the erase watcher waits unboundedly for
+  the pid to disappear; it never erases under a live session.
   Hub `history_request` → stream the session file as `history` chunks
   (shared/history.mjs), then re-emit any still-pending `question`. Hub
   `question_answer` → resolves the intercepted ask-user tool call. Ask-user

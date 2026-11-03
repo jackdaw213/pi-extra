@@ -28,7 +28,7 @@ function tokensEqual(a, b) {
   return timingSafeEqual(tokenDigest(a), tokenDigest(b));
 }
 
-export function createAgentHub({ registry, getTokens, fanout }) {
+export function createAgentHub({ registry, getTokens, fanout, onMachinesChanged }) {
   const conns = new Map(); // connId -> { id, ws, lastSeen, token }
 
   // Pending phone-initiated file fetches: "connId/sessionId" -> { fetchId, resolve, timer }.
@@ -83,7 +83,12 @@ export function createAgentHub({ registry, getTokens, fanout }) {
           return;
         }
         conn.token = f.token;
-        if (registry.register(conn.id, f.machine, f.session, f.token)) broadcastRegistry();
+        if (registry.register(conn.id, f.machine, f.session, f.token)) {
+          broadcastRegistry();
+          try {
+            onMachinesChanged?.(); // machine identity/addresses/token may be new
+          } catch {}
+        }
         send(conn.ws, P.frame(P.H_WELCOME));
         return;
       }

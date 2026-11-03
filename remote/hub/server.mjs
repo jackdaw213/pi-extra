@@ -11,7 +11,7 @@
 // PI_REMOTE_PORT (default 8787).
 
 import http from "node:http";
-import { existsSync, readFileSync, statSync } from "node:fs";
+import { existsSync, mkdirSync, readFileSync, renameSync, statSync, writeFileSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { createRegistry } from "./registry.mjs";
@@ -30,6 +30,10 @@ if (!password) {
   process.exit(1);
 }
 const tokensFile = process.env.PI_REMOTE_TOKENS_FILE || "/data/tokens";
+// Machine records (identity, addresses, spawn token) survive hub restarts so
+// cold spawn (SPEC §6 path 2) works before any pi session reconnects. Lives
+// next to the tokens file by default — same volume, same trust domain.
+const machinesFile = process.env.PI_REMOTE_MACHINES_FILE || path.join(path.dirname(tokensFile), "machines.json");
 
 function loadTokens() {
   try {
@@ -54,13 +58,36 @@ process.on("SIGHUP", () => {
 // --- wiring -------------------------------------------------------------------
 
 const registry = createRegistry();
+
+// Boot-time restore of machine records (best effort: a corrupt/unwritable
+// file must never keep the hub from starting — machines relearn on hello).
+try {
+  const restored = registry.restoreMachineRecords(JSON.parse(readFileSync(machinesFile, "utf8")));
+  if (restored > 0) log(`Restored ${restored} machine record(s) from ${machinesFile}`);
+} catch {}
+
+// Called when a hello (re)registers a machine: persist the records so the
+// NEXT hub restart can cold-spawn immediately. Atomic-ish write: temp file
+// + rename, failures only logged.
+function persistMachineRecords() {
+  try {
+    const dir = path.dirname(machinesFile);
+    if (!existsSync(dir)) mkdirSync(dir, { recursive: true });
+    const tmp = machinesFile + ".tmp";
+    writeFileSync(tmp, JSON.stringify(registry.machineRecordsSnapshot(), null, 2), { mode: 0o644 });
+    renameSync(tmp, machinesFile);
+  } catch (e) {
+    log(`WARNING: cannot persist machine records to ${machinesFile}: ${e?.message || e}`);
+  }
+}
+
 let phoneApi = null;
 const fanout = (frame) => {
   try {
     phoneApi?.broadcast(frame);
   } catch {}
 };
-const agents = createAgentHub({ registry, getTokens: () => tokens, fanout });
+const agents = createAgentHub({ registry, getTokens: () => tokens, fanout, onMachinesChanged: persistMachineRecords });
 phoneApi = createPhoneApi({ registry, agents, password });
 
 // --- static PWA (./web, built by the PWA build; optional at runtime) ----------

@@ -84,8 +84,15 @@ function closeRow(row) {
 
 // Immediate visible feedback for ANY delete trigger (button tap or full
 // swipe): card dims, toast flies, card animates out optimistically. The next
-// registry snapshot reconciles — if the session reappears (stale extension),
-// it stays; we never fight the registry.
+// registry snapshot reconciles — if the session reappears (stale extension,
+// failed delete), it stays; we never fight the registry.
+// The reconciliation re-pull is delayed ~1.5 s: an immediate GET races the
+// extension teardown (the session is still registered until its socket
+// closes) and pops the card right back for a blink. The WS registry frame
+// that lands when the hub drops the session re-renders earlier anyway; this
+// delayed GET is the fallback for a phone whose push socket is suspended.
+const DELETE_RECONCILE_MS = 1500;
+
 function beginDelete(machineId, s, row) {
   toast("Delete sent");
   row.classList.add("card-leaving");
@@ -97,7 +104,7 @@ function beginDelete(machineId, s, row) {
   const remove = () => row.remove();
   row.addEventListener("animationend", remove, { once: true });
   setTimeout(remove, 500); // fallback if animationend never fires
-  if (refreshHook) refreshHook();
+  if (refreshHook) setTimeout(refreshHook, DELETE_RECONCILE_MS);
 }
 
 // Pointer events (touch + mouse) drive the pure state machine; the card

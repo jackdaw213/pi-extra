@@ -91,6 +91,39 @@ export function createRegistry() {
     return machines.get(machineId) || null; // { machine, spawnToken, connIds }
   }
 
+  // Persistable machine records: identity, addresses, spawn token. Restored
+  // at boot so cold spawn (SPEC §6 path 2) works right after a hub restart,
+  // before any pi session has connected again.
+  function machineRecordsSnapshot() {
+    return [...machines.values()].map((m) => ({
+      machine: { ...m.machine, addresses: [...(m.machine.addresses || [])] },
+      spawnToken: m.spawnToken,
+    }));
+  }
+
+  // Seeds machine records from a machineRecordsSnapshot() array. Sessions and
+  // connections are NOT restored — only the data cold spawn needs. Returns
+  // the number of records added (known machines keep their in-memory record).
+  function restoreMachineRecords(list) {
+    if (!Array.isArray(list)) return 0;
+    let added = 0;
+    for (const rec of list) {
+      const id = rec?.machine?.id;
+      if (typeof id !== "string" || id.length === 0 || machines.has(id)) continue;
+      const machine = {
+        ...rec.machine,
+        addresses: Array.isArray(rec.machine.addresses) ? rec.machine.addresses.slice() : [],
+      };
+      machines.set(id, {
+        machine,
+        spawnToken: typeof rec.spawnToken === "string" ? rec.spawnToken : "",
+        connIds: new Set(),
+      });
+      added++;
+    }
+    return added;
+  }
+
   // Connection id holding any live session of the machine, or null.
   function liveSessionConnId(machineId) {
     for (const e of sessions.values()) if (e.machineId === machineId) return e.connId;
@@ -140,6 +173,8 @@ export function createRegistry() {
     applyState,
     getEntry,
     getMachine,
+    machineRecordsSnapshot,
+    restoreMachineRecords,
     liveSessionConnId,
     machineConnIds,
     hasLiveSession,

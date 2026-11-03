@@ -518,13 +518,7 @@ export class SessionBridge {
 			case H_STOP:
 				// Remote (phone-spawned) sessions may be shut down from the phone;
 				// terminal sessions must survive it.
-				if (this.mode === "remote") {
-					try {
-						this.ctx.shutdown();
-					} catch (err) {
-						this.uiNotify(`[pi-remote] shutdown failed: ${errText(err)}`);
-					}
-				}
+				if (this.mode === "remote") this.shutdownRemoteSession();
 				break;
 			case H_DELETE:
 				// Swipe-to-delete (ADR 0006): stops ANY mode — this deliberately
@@ -571,9 +565,73 @@ export class SessionBridge {
 		}
 	}
 
+	// Stop a remote (phone-spawned, --mode rpc) session for real. pi's RPC
+	// loop only re-checks the extension shutdown flag after the next stdin
+	// command or an agent_settled event, and phone-spawned sessions have a
+	// stdin pipe that never closes and no RPC client — so ctx.shutdown() alone
+	// leaves an IDLE session alive forever: a zombie the hub keeps listing
+	// (the phone card pops back after the optimistic delete animation) and
+	// whose temp transcript the erase watcher would eventually remove under
+	// the still-running process. Abort any active run first so a busy session
+	// settles into pi's deferred shutdown promptly, then, when idle, exit
+	// explicitly after a short grace that lets the socket flush.
+	private shutdownRemoteSession(): void {
+		try {
+			this.ctx.abort?.();
+		} catch {
+			/* idle abort is a no-op; keep going */
+		}
+		try {
+			this.ctx.shutdown();
+		} catch (err) {
+			this.uiNotify(`[pi-remote] shutdown failed: ${errText(err)}`);
+			return;
+		}
+		this.spawnUnitCleanupWatcher();
+		if (typeof this.ctx.isIdle === "function" && this.ctx.isIdle()) {
+			setTimeout(() => process.exit(0), 250);
+		}
+	}
+
+	// Phone-spawned sessions run as `sh -c 'sleep infinity | exec pi ...'` in a
+	// transient unit: the unit's main pid is the pipeline sh, which waits on
+	// `sleep infinity` even after pi has exited — without help the unit (and
+	// the sleep) outlive the session forever. Detached watcher: once the pi
+	// pid is gone, stop the unit (the control-group kill ends sh and sleep;
+	// --collect removes it). Best effort: if the manager cannot be reached the
+	// unit lingers until reboot, exactly as before.
+	private spawnUnitCleanupWatcher(): void {
+		let unit = "";
+		try {
+			const line = readFileSync("/proc/self/cgroup", "utf8")
+				.split("\n")
+				.find((l) => l.startsWith("0::"));
+			unit = line?.trim().split("/").pop() || "";
+		} catch {
+			/* no cgroup file: not systemd-run, nothing to clean */
+		}
+		// Only transient systemd-run units (shared/spawn.mjs) get this shape.
+		if (!/^run-p.*\.service$/.test(unit)) return;
+		const script =
+			'while kill -0 "$1" 2>/dev/null; do sleep 0.2; done; '
+			+ 'systemctl --user stop "$2" 2>/dev/null || true';
+		try {
+			const child = spawnDetached(
+				"sh",
+				["-c", script, "sh", String(process.pid), unit],
+				{ detached: true, stdio: "ignore" }
+			);
+			child.unref();
+		} catch (err) {
+			this.uiNotify(`[pi-remote] unit cleanup watcher failed: ${errText(err)}`);
+		}
+	}
+
 	// Delete (ADR 0006): stop the session; when erase is true, also remove its
 	// transcript — only for temp sessions (defense in depth; the hub validates
-	// the registry kind too, but this side owns the filesystem).
+	// the registry kind too, but this side owns the filesystem). Terminal
+	// sessions keep plain ctx.shutdown() (pi's TUI mode exits immediately when
+	// idle and defers mid-run); remote sessions get the RPC-safe path above.
 	private async handleDelete(f: any): Promise<void> {
 		if (typeof f.sessionId === "string" && f.sessionId !== this.sessionId) {
 			this.uiNotify(`[pi-remote] delete is for session ${f.sessionId}, not ${this.sessionId}; ignoring`);
@@ -587,6 +645,10 @@ export class SessionBridge {
 			return;
 		}
 		if (erase) this.spawnEraseWatcher();
+		if (this.mode === "remote") {
+			this.shutdownRemoteSession();
+			return;
+		}
 		try {
 			this.ctx.shutdown();
 		} catch (err) {
@@ -596,10 +658,11 @@ export class SessionBridge {
 
 	// Erase must happen AFTER this process exits, so the watcher is a detached
 	// sh that waits for the pi pid to disappear, then removes the transcript and
-	// the session's remote inbox (temp means everything goes). The 120 s cap is
-	// a backstop, not a timer: if shutdown somehow fails and the process keeps
-	// running past it, the transcript is erased under the live session —
-	// accepted because this path is gated to temp sessions twice (hub + here).
+	// the session's remote inbox (temp means everything goes). No timeout cap:
+	// a cap would erase the transcript under a session that failed to exit
+	// (blank chat on attach). If the process never dies or the machine
+	// reboots first, the files simply survive — keeping data is the safe
+	// failure mode for an erase.
 	private spawnEraseWatcher(): void {
 		const pid = String(process.pid);
 		const inboxDir = join(homedir(), ".pi", "remote", "inbox", this.sessionId);
@@ -609,7 +672,7 @@ export class SessionBridge {
 				// quoting safe for paths with spaces. rm runs even when no transcript
 				// file was located, so the inbox never outlives a temp session.
 				const script =
-					'i=0; while kill -0 "$1" 2>/dev/null && [ "$i" -lt 600 ]; do sleep 0.2; i=$((i+1)); done; '
+					'while kill -0 "$1" 2>/dev/null; do sleep 0.2; done; '
 					+ '[ -n "$2" ] && rm -f -- "$2"; rm -rf -- "$3"';
 				const child = spawnDetached(
 					"sh",
