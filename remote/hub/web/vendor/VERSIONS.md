@@ -11,3 +11,4 @@ fetched from. Re-vendor by re-running the same URL.
 | `highlightjs/package.json` | local scope file, not a published artifact | — | Node scope only: repo root is `"type": "module"`; without `{"type":"commonjs"}` here Node would treat the UMD bundle as ESM and `require()` would return `{}` |
 | `mermaid/mermaid.esm.min.mjs` | mermaid 12.2.0 | `https://registry.npmjs.org/mermaid/-/mermaid-12.2.0.tgz` (path `package/dist/mermaid.esm.min.mjs`) | client-side diagram rendering (browser only) |
 | `mermaid/chunks/mermaid.esm.min/*.mjs` | mermaid 12.2.0 (104 chunk files, `.map` files excluded) | same tarball, path `package/dist/chunks/mermaid.esm.min/*.mjs` | imported relatively by `mermaid.esm.min.mjs`; must ship together |
+| `simplewebauthn/bundle.umd.min.js` | @simplewebauthn/browser 13.3.0 | `https://unpkg.com/@simplewebauthn/browser@13.3.0/dist/bundle/index.umd.min.js` | passkey (Face ID) login — browser WebAuthn ceremony (global `SimpleWebAuthnBrowser`) |

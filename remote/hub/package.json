@@ -12,6 +12,7 @@
     "start": "node server.mjs"
   },
   "dependencies": {
+    "@simplewebauthn/server": "^13.3.3",
     "ws": "^8.18.0"
   }
 }

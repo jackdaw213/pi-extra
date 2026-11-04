@@ -11,9 +11,28 @@ cd hub/
 docker compose up -d
 ```
 
-The hub listens on **8787**. Dashboard login comes from `PI_REMOTE_PASSWORD`;
-`PI_REMOTE_TOKENS_FILE` defaults to `/data/tokens` in the `pi-remote-data`
-volume.
+The hub listens on **8787**. Dashboard login comes from `PI_REMOTE_PASSWORD`
+(read from the environment or a `.env` file next to the compose file — keep
+that file out of any repository); `PI_REMOTE_TOKENS_FILE` defaults to
+`/data/tokens` in the `pi-remote-data` volume.
+
+### Passkey (Face ID) login — optional, HTTPS only
+
+WebAuthn credentials are bound to the serving domain, and browsers refuse the
+ceremony on plain HTTP. Once the dashboard is reachable over HTTPS (e.g. via
+Nginx Proxy Manager with a Let's Encrypt cert for a DuckDNS domain), set:
+
+```bash
+# .env next to the compose file
+PI_REMOTE_RP_ID=pi-remote.example.duckdns.org     # the serving domain
+PI_REMOTE_ORIGIN=https://pi-remote.example.duckdns.org  # optional; defaults to https://<RP_ID>
+```
+
+Then `docker compose up -d` (recreate picks up the env). With `PI_REMOTE_RP_ID`
+set, the login page offers "Sign in with Face ID" after the first passkey is
+registered (password login → "Add Face ID" banner on the dashboard). Password
+login always remains as fallback; removing the banner's passkey restores
+password-only. `PI_REMOTE_RP_ID` unset (default) keeps the endpoints disabled.
 
 ## 2. Register a machine token
 

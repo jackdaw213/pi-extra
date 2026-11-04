@@ -173,7 +173,7 @@ function parseMultipart(body, contentType) {
   return { fields, file };
 }
 
-export function createPhoneApi({ registry, agents, password }) {
+export function createPhoneApi({ registry, agents, password, passkeys }) {
   // Idle window for the stateless tokens: an untouched cookie expires after
   // 15 minutes; authenticated requests re-issue (slide) the cookie while at
   // least half the window remains. WS upgrades only validate — an
@@ -399,6 +399,87 @@ export function createPhoneApi({ registry, agents, password }) {
     return sendJson(res, 202, { ok: true }); // chunks arrive as history frames on /ws
   }
 
+  // ---- passkey (WebAuthn) login — docs/SPEC.md §10 ------------------------
+  // The hub stays single-user: registration requires the password cookie, so
+  // a passkey can only be ADDED by someone who already knows the password.
+  // Passkey login mints the same stateless pr_auth cookie as the password.
+  // All endpoints answer 400 when the feature is disabled (no PI_REMOTE_RP_ID).
+  function passkeyDisabled(res) {
+    return sendJson(res, 400, { error: "Passkeys are disabled: PI_REMOTE_RP_ID is not set on the hub." });
+  }
+
+  async function handlePasskeyStatus(req, res) {
+    // Public: the login view needs the flag before any auth. It leaks nothing
+    // beyond "a passkey exists".
+    const s = passkeys.status();
+    return sendJson(res, 200, { enabled: s.enabled, registered: s.registered });
+  }
+
+  async function handlePasskeyRegisterOptions(req, res) {
+    if (!passkeys.enabled) return passkeyDisabled(res);
+    const { options, token } = await passkeys.registrationOptions();
+    return sendJson(res, 200, { options, token });
+  }
+
+  async function handlePasskeyRegister(req, res) {
+    if (!passkeys.enabled) return passkeyDisabled(res);
+    let b;
+    try {
+      b = await jsonBody(req);
+    } catch (e) {
+      return bodyError(res, e);
+    }
+    try {
+      await passkeys.register(b.response, b.token);
+    } catch (e) {
+      return sendJson(res, 400, { error: e instanceof Error ? e.message : "The passkey could not be registered." });
+    }
+    return sendNoContent(res);
+  }
+
+  async function handlePasskeyLoginOptions(req, res) {
+    if (!passkeys.enabled) return passkeyDisabled(res);
+    try {
+      const { options, token } = await passkeys.authenticationOptions();
+      return sendJson(res, 200, { options, token });
+    } catch (e) {
+      return sendJson(res, 400, { error: e instanceof Error ? e.message : "No passkey is registered." });
+    }
+  }
+
+  async function handlePasskeyLogin(req, res) {
+    if (!passkeys.enabled) return passkeyDisabled(res);
+    let b;
+    try {
+      b = await jsonBody(req);
+    } catch (e) {
+      return bodyError(res, e);
+    }
+    try {
+      await passkeys.login(b.response, b.token);
+    } catch (e) {
+      return sendJson(res, 401, { error: e instanceof Error ? e.message : "Passkey login failed." });
+    }
+    return sendNoContent(res, newAuthCookie()); // same session as password login
+  }
+
+  async function handlePasskeyDelete(req, res) {
+    if (!passkeys.enabled) return passkeyDisabled(res);
+    let b;
+    try {
+      b = await jsonBody(req);
+    } catch (e) {
+      return bodyError(res, e);
+    }
+    if (b.id !== undefined && (typeof b.id !== "string" || b.id.length === 0)) {
+      return sendJson(res, 400, { error: "id must be a non-empty string." });
+    }
+    // No id = remove all registered passkeys (single-user hub: they all
+    // belong to the same person; password login always recovers access).
+    passkeys.remove(typeof b.id === "string" ? b.id : undefined);
+    return sendNoContent(res);
+  }
+
   // Phone answer to a pending ask-user question (A_QUESTION -> H_QUESTION_ANSWER).
   // Body: { machineId, sessionId, callId, value?|custom?|cancelled? } — exactly
   // one of value (tapped option label), custom (typed text), cancelled (true).
@@ -573,6 +654,21 @@ export function createPhoneApi({ registry, agents, password }) {
       if (req.method !== "POST") return sendJson(res, 405, { error: "Use POST." });
       return handleLogin(req, res);
     }
+    // Public passkey LOGIN endpoints (pre-auth): the login view fetches the
+    // feature flag and drives the browser WebAuthn ceremony before any
+    // cookie exists. Registration/management endpoints stay behind the gate.
+    if (p === "/api/passkey/enabled") {
+      if (req.method !== "GET") return sendJson(res, 405, { error: "Use GET." });
+      return handlePasskeyStatus(req, res);
+    }
+    if (p === "/api/passkey/login/options") {
+      if (req.method !== "POST") return sendJson(res, 405, { error: "Use POST." });
+      return handlePasskeyLoginOptions(req, res);
+    }
+    if (p === "/api/passkey/login") {
+      if (req.method !== "POST") return sendJson(res, 405, { error: "Use POST." });
+      return handlePasskeyLogin(req, res);
+    }
 
     if (!isAuthed(req, { res })) return sendJson(res, 401, { error: "Login required." });
 
@@ -623,6 +719,20 @@ export function createPhoneApi({ registry, agents, password }) {
       if (req.method === "POST") return handleFileUpload(req, res);
       if (req.method === "GET") return handleFileDownload(req, res, url);
       return sendJson(res, 405, { error: "Use GET or POST." });
+    }
+    // Auth-only passkey endpoints (registration management). Login endpoints
+    // above sit BEFORE the auth gate on purpose.
+    if (p === "/api/passkey/register/options") {
+      if (req.method !== "POST") return sendJson(res, 405, { error: "Use POST." });
+      return handlePasskeyRegisterOptions(req, res);
+    }
+    if (p === "/api/passkey/register") {
+      if (req.method !== "POST") return sendJson(res, 405, { error: "Use POST." });
+      return handlePasskeyRegister(req, res);
+    }
+    if (p === "/api/passkey/delete") {
+      if (req.method !== "POST") return sendJson(res, 405, { error: "Use POST." });
+      return handlePasskeyDelete(req, res);
     }
     return sendJson(res, 404, { error: "Not found." });
   }

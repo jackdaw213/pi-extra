@@ -169,6 +169,17 @@ button, input, textarea { font: inherit; color: inherit; }
 .empty { text-align: center; padding: 48px 16px; }
 .empty p + p { margin-top: 6px; }
 
+/* Passkey (Face ID) banner under the session list: one dim line with the
+   offer/remove actions. Flex row so long text truncates, buttons stay put. */
+#passkey-banner {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding-bottom: 84px; /* clear the FAB */
+}
+#passkey-banner[hidden] { display: none; }
+#passkey-banner .dim.small { flex: 1; }
+
 /* --- state badges ------------------------------------------------------- */
 
 .badge {

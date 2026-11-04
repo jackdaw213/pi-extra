@@ -18,6 +18,11 @@ services:
       PI_REMOTE_PASSWORD: ${PI_REMOTE_PASSWORD:?Set PI_REMOTE_PASSWORD (env or .env)}
       PI_REMOTE_TOKENS_FILE: /data/tokens
       PI_REMOTE_PORT: "8787"
+      # Passkey (Face ID) login — only over HTTPS: set RP_ID to the dashboard
+      # domain; ORIGIN defaults to https://<RP_ID> (comma-separate extras).
+      # Both unset/empty = passkey endpoints disabled, password login only.
+      PI_REMOTE_RP_ID: ${PI_REMOTE_RP_ID:-}
+      PI_REMOTE_ORIGIN: ${PI_REMOTE_ORIGIN:-}
     volumes:
       - pi-remote-data:/data
     read_only: true

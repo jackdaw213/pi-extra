@@ -90,6 +90,12 @@ the hub origin. Static PWA at `/`.
 | Method/Path | Body/Query | Response |
 |---|---|---|
 | `POST /api/login` | `{ password }` | 204 + cookie; 401 otherwise. Constant-time compare. |
+| `GET /api/passkey/enabled` | — | Public. `{ enabled, registered }` — passkey login availability (enabled = `PI_REMOTE_RP_ID` set). |
+| `POST /api/passkey/login/options` | — | Public. `{ options, token }` (WebAuthn assertion options + HMAC challenge token); 400 when disabled or no passkey registered. |
+| `POST /api/passkey/login` | `{ response, token }` | Public. WebAuthn assertion; on verify 204 + the same `pr_auth` cookie as `login`; 401 otherwise. |
+| `POST /api/passkey/register/options` | — | Auth. `{ options, token }` (attestation options; `excludeCredentials` for known ids). |
+| `POST /api/passkey/register` | `{ response, token }` | Auth. Verify + store credential in `passkeys.json`; 204. |
+| `POST /api/passkey/delete` | `{ id? }` | Auth. Remove one credential (no `id` = all). Password login always recovers access. |
 | `GET /api/registry` | — | `{ machines: [{ machine, sessions: [sessionSummary] }] }` (sessionSummary = hello payload session + state + connectedSince) |
 | `POST /api/message` | `{ sessionId, machineId, text, deliverAs? }` | 202; queued to agent; result arrives on WS as `message_result` echo with same `ref`. |
 | `POST /api/spawn` | `{ machineId, name?, kind? }` | If a live session exists on machine: `spawn` via it. Else: knock stub `http://<machine-ip>:8788/spawn` (§6). `kind`: `"temp"` default, `"normal"` otherwise (400 on other values; ADR 0006). 202 `{ ref }`; outcome via WS `spawn_result` echo. |
@@ -254,6 +260,15 @@ Vanilla ES modules, no build step. Pages: login, dashboard, attach view.
   `no-new-privileges: true`, volume `pi-remote-data:/data`,
   `restart: unless-stopped`, healthcheck `wget -qO- localhost:8787/api/health`.
 - `GET /api/health` → `{ok:true}` (no auth).
+- Passkey (WebAuthn) login: enabled by `PI_REMOTE_RP_ID` (+ `PI_REMOTE_ORIGIN`,
+  default `https://<RP_ID>`); requires HTTPS on the serving origin (browsers
+  refuse the ceremony on plain HTTP). Registration needs the password session,
+  so a passkey can only be added by someone who knows the password. Challenges
+  are stateless: HMAC-signed tokens (`<challenge>.<expiry>.<mac>`, 5 min TTL)
+  issued with the options and posted back with the response. Credentials live
+  in `passkeys.json` next to the tokens file. Counter policy: enforce
+  monotonicity only when both stored and new counters are non-zero
+  (iCloud-synced passkeys stay at 0). Password login always works as fallback.
 
 ## 11. Stub & units (per machine, optional — cold start)
 

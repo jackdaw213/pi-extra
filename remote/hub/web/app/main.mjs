@@ -4,6 +4,7 @@ import { initToastHost, toast } from "./ui.mjs";
 import * as api from "./api.mjs";
 import { PushChannel } from "./ws.mjs";
 import { renderDashboard, onSpawnResult } from "./dashboard.mjs";
+import { wireLoginButton, onPasskeyLoginSuccess, mountBanner } from "./passkeys.mjs";
 import * as attach from "./attach.mjs";
 import { parseHash } from "./util.mjs";
 import { createIdleController } from "./idle.mjs";
@@ -42,6 +43,7 @@ async function loadRegistry() {
 
 function renderDash() {
   renderDashboard(q("machine-list"), state.reg, { refresh: refreshRegistry });
+  mountBanner(q("passkey-banner"));
 }
 
 async function refreshRegistry() {
@@ -58,6 +60,7 @@ function route() {
   const r = parseHash(location.hash);
   if (!state.authed) {
     show("login");
+    void wireLoginButton(q("login-passkey"));
     return;
   }
   if (r) {
@@ -115,6 +118,14 @@ function boot() {
     } finally {
       btn.disabled = false;
     }
+  });
+
+  // Passkey login shares the password form's post-login path; errors are
+  // reported by the passkey module into #login-error.
+  onPasskeyLoginSuccess(async () => {
+    state.authed = true;
+    await refreshRegistry();
+    route();
   });
 
   // Any API 401 -> back to the login view.

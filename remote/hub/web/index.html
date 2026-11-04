@@ -24,6 +24,7 @@
       <input id="login-password" type="password" autocomplete="current-password"
              placeholder="Password" required>
       <button id="login-submit" class="btn primary block" type="submit">Sign in</button>
+      <button id="login-passkey" class="btn block" type="button" hidden>Sign in with Face ID</button>
       <p id="login-error" class="error" role="alert"></p>
     </form>
   </section>
@@ -35,6 +36,9 @@
       <span id="conn-dot" class="conn" title="Connection"></span>
     </header>
     <main id="machine-list" class="content"></main>
+    <!-- Passkey (Face ID) banner: rendered by app/passkeys.mjs. Sits outside
+         #machine-list so dashboard re-renders never wipe it. -->
+    <div id="passkey-banner" class="content" hidden></div>
   </section>
 
   <!-- Attach view -->
@@ -74,6 +78,7 @@
   </section>
 
   <script defer src="vendor/highlightjs/highlight.min.js"></script>
+  <script defer src="vendor/simplewebauthn/bundle.umd.min.js"></script>
   <script type="module" src="app/main.mjs"></script>
 </body>
 </html>

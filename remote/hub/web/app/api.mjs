@@ -123,6 +123,96 @@ export async function historyRequest(machineId, sessionId) {
   if (!res.ok) throw new Error(`History request failed (${res.status})`);
 }
 
+// ---- passkey (Face ID) login — see app/passkeys.mjs for the flows --------
+
+// GET /api/passkey/enabled -> { enabled, registered }. Public: the login
+// view needs the flag before any auth.
+export async function passkeyStatus() {
+  const res = await fetch("/api/passkey/enabled");
+  if (!res.ok) throw new Error(`Passkey status failed (${res.status})`);
+  return res.json();
+}
+
+// POST /api/passkey/login/options -> { options, token }. Public.
+export async function passkeyLoginOptions() {
+  let res;
+  try {
+    res = await fetch("/api/passkey/login/options", { method: "POST" });
+  } catch {
+    throw new Error("Network error");
+  }
+  if (!res.ok) {
+    let msg = null;
+    try {
+      msg = (await res.json())?.error ?? null;
+    } catch {}
+    throw new Error(msg || `Passkey options failed (${res.status})`);
+  }
+  return res.json();
+}
+
+// POST /api/passkey/login { response, token } -> 204 + pr_auth cookie.
+export async function passkeyLogin(assertion, token) {
+  let res;
+  try {
+    res = await fetch("/api/passkey/login", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ response: assertion, token }),
+    });
+  } catch {
+    throw new Error("Network error");
+  }
+  if (!res.ok) {
+    let msg = null;
+    try {
+      msg = (await res.json())?.error ?? null;
+    } catch {}
+    throw new Error(msg || `Passkey login failed (${res.status})`);
+  }
+  return true;
+}
+
+// POST /api/passkey/register/options (auth) -> { options, token }.
+export async function passkeyRegisterOptions() {
+  const res = await req("POST", "/api/passkey/register/options");
+  if (!res.ok) {
+    let msg = null;
+    try {
+      msg = (await res.json())?.error ?? null;
+    } catch {}
+    throw new Error(msg || `Passkey options failed (${res.status})`);
+  }
+  return res.json();
+}
+
+// POST /api/passkey/register { response, token } (auth) -> 204.
+export async function passkeyRegister(attestation, token) {
+  const res = await req("POST", "/api/passkey/register", { response: attestation, token });
+  if (!res.ok) {
+    let msg = null;
+    try {
+      msg = (await res.json())?.error ?? null;
+    } catch {}
+    throw new Error(msg || `Passkey registration failed (${res.status})`);
+  }
+  return true;
+}
+
+// POST /api/passkey/delete { id? } (auth) -> 204. No id = remove all.
+export async function passkeyDelete(id) {
+  const body = id === undefined ? {} : { id };
+  const res = await req("POST", "/api/passkey/delete", body);
+  if (!res.ok) {
+    let msg = null;
+    try {
+      msg = (await res.json())?.error ?? null;
+    } catch {}
+    throw new Error(msg || `Passkey removal failed (${res.status})`);
+  }
+  return true;
+}
+
 // POST /api/answer { machineId, sessionId, callId, value?|custom? } -> 202.
 // answer is { value } (tapped option label) or { custom } (typed text); the
 // phone never sends cancelled — the extension settles questions itself.

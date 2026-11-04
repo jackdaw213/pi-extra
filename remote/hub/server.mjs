@@ -17,6 +17,7 @@ import { fileURLToPath } from "node:url";
 import { createRegistry } from "./registry.mjs";
 import { createAgentHub } from "./agents.mjs";
 import { createPhoneApi } from "./phoneapi.mjs";
+import { createPasskeyStore, parseOrigins } from "./passkeys.mjs";
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const log = (...a) => console.log(new Date().toISOString(), "-", ...a);
@@ -34,6 +35,15 @@ const tokensFile = process.env.PI_REMOTE_TOKENS_FILE || "/data/tokens";
 // cold spawn (SPEC §6 path 2) works before any pi session reconnects. Lives
 // next to the tokens file by default — same volume, same trust domain.
 const machinesFile = process.env.PI_REMOTE_MACHINES_FILE || path.join(path.dirname(tokensFile), "machines.json");
+
+// Passkey (WebAuthn) login — disabled until an RP ID is configured, because
+// credentials are bound to the HTTPS domain serving the dashboard (browsers
+// refuse the ceremony on plain HTTP). Set PI_REMOTE_RP_ID (+ optionally
+// PI_REMOTE_ORIGIN, default https://<RP_ID>) once the hub is on HTTPS.
+const rpId = (process.env.PI_REMOTE_RP_ID || "").trim();
+const passkeyOrigins = parseOrigins(process.env.PI_REMOTE_ORIGIN, rpId);
+const passkeysFile = process.env.PI_REMOTE_PASSKEYS_FILE || path.join(path.dirname(tokensFile), "passkeys.json");
+const passkeys = createPasskeyStore({ password, file: passkeysFile, rpId, origins: passkeyOrigins });
 
 function loadTokens() {
   try {
@@ -88,7 +98,7 @@ const fanout = (frame) => {
   } catch {}
 };
 const agents = createAgentHub({ registry, getTokens: () => tokens, fanout, onMachinesChanged: persistMachineRecords });
-phoneApi = createPhoneApi({ registry, agents, password });
+phoneApi = createPhoneApi({ registry, agents, password, passkeys });
 
 // --- static PWA (./web, built by the PWA build; optional at runtime) ----------
 
@@ -206,6 +216,11 @@ server.on("upgrade", (req, socket, head) => {
 server.listen(port, "0.0.0.0", () => {
   log(`pi-remote hub listening on port ${port}`);
   log(`Agents: ws://<host>:${port}/agent | Phones: /ws (cookie auth) | Web UI: ${webAvailable ? "./web" : "missing"}`);
+  if (passkeys.enabled) {
+    log(`Passkeys: enabled (RP ID ${rpId}, origins: ${passkeyOrigins.join(", ")})`);
+  } else {
+    log("Passkeys: disabled (set PI_REMOTE_RP_ID once the dashboard is on HTTPS)");
+  }
 });
 
 // Keep the always-on hub alive through stray async errors; log loudly.
